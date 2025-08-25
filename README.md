@@ -1,5 +1,5 @@
 
-# md-editor
+# MARKDOWN-EDITOR
 =======
 # React BlogSpace
 
