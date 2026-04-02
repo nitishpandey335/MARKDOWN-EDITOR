@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+  namespace: markdown-editor
+  labels:
+    app: backend
+spec:
+  replicas: 2   # 2 pods for high availability
+
+  # Rolling update: bring up new pods before killing old ones (zero downtime)
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        # allow 1 extra pod during update
+      maxUnavailable: 0  # never have fewer than desired replicas
+
+  selector:
+    matchLabels:
+      app: backend   # must match template labels below
+
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      # Spread pods across different nodes for resilience
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values: [backend]
+                topologyKey: kubernetes.io/hostname
+
+      containers:
+        - name: backend
+          image: nitishpandey335/markdown-backend:latest
+          imagePullPolicy: Always   # always pull latest on pod restart
+          ports:
+            - containerPort: 5000
+
+          # Inject non-sensitive config from ConfigMap
+          envFrom:
+            - configMapRef:
+                name: app-config
+
+          # Inject sensitive values from Secret
+          env:
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: MONGO_URI
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: JWT_SECRET
+
+          # Liveness probe: restart pod if it stops responding
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 5000
+            initialDelaySeconds: 20   # wait for app to start
+            periodSeconds: 15
+            failureThreshold: 3
+
+          # Readiness probe: only send traffic when app is ready
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+
+          # Resource limits prevent one pod from starving others
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"

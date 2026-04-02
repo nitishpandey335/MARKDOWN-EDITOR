@@ -1,0 +1,19 @@
+# Service exposes the backend pods inside the cluster
+# ClusterIP = only accessible within the cluster (frontend talks to it via DNS)
+# Change to LoadBalancer if you want direct external access to the API
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: markdown-editor
+  labels:
+    app: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: backend   # routes traffic to pods with this label
+  ports:
+    - name: http
+      protocol: TCP
+      port: 5000        # port the Service listens on
+      targetPort: 5000  # port on the pod

@@ -1,0 +1,8 @@
+# All our app resources live in this namespace
+# This keeps them isolated from other workloads on the cluster
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: markdown-editor
+  labels:
+    app: markdown-editor

@@ -1,0 +1,70 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────
+# Local development setup using Docker Compose
+# Run: docker-compose up --build
+# ─────────────────────────────────────────────
+
+services:
+
+  # ── MongoDB (local dev only; use Atlas in production) ──
+  mongo:
+    image: mongo:7.0
+    container_name: markdown-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db   # persist data between restarts
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: rootpassword
+    networks:
+      - app-network
+
+  # ── Backend (Node.js / Express) ──
+  backend:
+    build:
+      context: .                          # build context is project root
+      dockerfile: docker/backend/Dockerfile
+    container_name: markdown-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: development
+      PORT: 5000
+      # For local dev, point to the mongo container above
+      MONGO_URI: mongodb://root:rootpassword@mongo:27017/markdowndb?authSource=admin
+      JWT_SECRET: local_dev_jwt_secret_change_in_prod
+    depends_on:
+      - mongo
+    networks:
+      - app-network
+    # Mount source for hot-reload during local dev (optional)
+    volumes:
+      - ./backend:/app
+      - /app/node_modules   # prevent host node_modules from overwriting container's
+
+  # ── Frontend (React / Vite → Nginx) ──
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+    container_name: markdown-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    environment:
+      VITE_BACKEND_URL: http://localhost:5000/api
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+volumes:
+  mongo_data:   # named volume so MongoDB data survives container restarts
+
+networks:
+  app-network:
+    driver: bridge

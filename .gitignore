@@ -9,3 +9,6 @@ node_modules/
 
 .env.development
 */.env.development
+
+# Kubernetes secrets — never commit real credentials
+k8s/secret.yaml
