@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         DOCKERHUB_USERNAME = 'nitishpandey335'
 
         BACKEND_IMAGE = "${DOCKERHUB_USERNAME}/markdown-backend"
@@ -21,12 +20,6 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
-            steps {
-                echo "Skipping npm install for now"
-            }
-        }
-
         stage('Build Docker Images') {
             steps {
                 sh """
@@ -38,12 +31,15 @@ pipeline {
 
         stage('Push to Docker Hub') {
             steps {
-                sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
 
-                sh """
-                docker push ${BACKEND_IMAGE}:${IMAGE_TAG}
-                docker push ${FRONTEND_IMAGE}:${IMAGE_TAG}
-                """
+                    sh 'echo $PASS | docker login -u $USER --password-stdin'
+
+                    sh """
+                    docker push ${BACKEND_IMAGE}:${IMAGE_TAG}
+                    docker push ${FRONTEND_IMAGE}:${IMAGE_TAG}
+                    """
+                }
             }
         }
 
