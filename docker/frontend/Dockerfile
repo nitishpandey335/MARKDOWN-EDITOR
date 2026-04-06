@@ -3,37 +3,43 @@
 # ─────────────────────────────────────────────
 FROM node:20-alpine AS builder
 
-# Set working directory inside the container
 WORKDIR /app
 
-# Copy only package files first (better layer caching)
+# Copy package files
 COPY frontend/package*.json ./
 
-# Install all dependencies (including devDeps needed for build)
-RUN npm ci
+# Remove local file reference that breaks Docker build
+RUN node -e "
+  const fs = require('fs');
+  const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+  delete pkg.dependencies['react-md-editor-monorepo'];
+  if (pkg.devDependencies) delete pkg.devDependencies['react-md-editor-monorepo'];
+  fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+"
 
-# Copy the rest of the frontend source code
+# Install all dependencies
+RUN npm install --legacy-peer-deps
+
+# Copy frontend source
 COPY frontend/ .
 
-# Build the production bundle (outputs to /app/dist)
+# Set backend URL for production build
+ARG VITE_BACKEND_URL
+ENV VITE_BACKEND_URL=$VITE_BACKEND_URL
+
+# Build production bundle
 RUN npm run build
 
 # ─────────────────────────────────────────────
-# Stage 2: Serve with Nginx (lightweight)
+# Stage 2: Serve with Nginx
 # ─────────────────────────────────────────────
 FROM nginx:1.25-alpine
 
-# Remove default nginx static files
 RUN rm -rf /usr/share/nginx/html/*
 
-# Copy built files from Stage 1
 COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Copy custom nginx config (handles React Router SPA routing)
 COPY docker/frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
-# Expose port 80
 EXPOSE 80
 
-# Start nginx in foreground (required for Docker)
 CMD ["nginx", "-g", "daemon off;"]

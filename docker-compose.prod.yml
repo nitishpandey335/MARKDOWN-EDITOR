@@ -42,6 +42,9 @@ services:
     build:
       context: .
       dockerfile: docker/frontend/Dockerfile
+      args:
+        # Pass EC2 IP so Vite bakes the correct API URL into the build
+        VITE_BACKEND_URL: http://${EC2_IP:-localhost}:5000/api
     container_name: markdown-frontend
     restart: always
     ports:
