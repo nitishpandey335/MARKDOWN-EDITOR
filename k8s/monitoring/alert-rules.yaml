@@ -1,0 +1,80 @@
+# ─────────────────────────────────────────────
+# PrometheusRule — defines alert conditions
+# Prometheus evaluates these every minute
+# Alerts fire when condition is true for the specified duration
+# ─────────────────────────────────────────────
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: markdown-editor-alerts
+  namespace: markdown-editor
+  labels:
+    release: prometheus   # must match kube-prometheus-stack release name
+spec:
+  groups:
+    - name: backend.alerts
+      interval: 30s   # evaluate every 30 seconds
+      rules:
+
+        # ── Alert 1: Backend Pod is Down ──
+        # Fires if no backend pods are running for 1 minute
+        - alert: BackendDown
+          expr: absent(up{job="markdown-editor/backend-monitor"} == 1)
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Backend service is DOWN"
+            description: "No backend pods have been reachable for more than 1 minute."
+
+        # ── Alert 2: High CPU Usage ──
+        # Fires if any backend pod uses > 80% CPU for 2 minutes
+        - alert: HighCPUUsage
+          expr: |
+            rate(process_cpu_seconds_total{job="markdown-editor/backend-monitor"}[2m]) * 100 > 80
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High CPU usage on backend"
+            description: "Backend CPU usage is above 80% for 2 minutes. Current: {{ $value }}%"
+
+        # ── Alert 3: High Memory Usage ──
+        # Fires if backend heap memory > 400MB for 2 minutes
+        - alert: HighMemoryUsage
+          expr: |
+            process_resident_memory_bytes{job="markdown-editor/backend-monitor"} > 400 * 1024 * 1024
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High memory usage on backend"
+            description: "Backend memory usage exceeded 400MB. Current: {{ $value | humanize }}B"
+
+        # ── Alert 4: High HTTP Error Rate ──
+        # Fires if > 10% of requests return 5xx errors in last 5 minutes
+        - alert: HighErrorRate
+          expr: |
+            rate(http_requests_total{status_code=~"5..",job="markdown-editor/backend-monitor"}[5m])
+            /
+            rate(http_requests_total{job="markdown-editor/backend-monitor"}[5m]) > 0.1
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "High HTTP 5xx error rate"
+            description: "More than 10% of requests are failing with 5xx errors."
+
+        # ── Alert 5: Slow Response Time ──
+        # Fires if 95th percentile response time > 2 seconds
+        - alert: SlowResponseTime
+          expr: |
+            histogram_quantile(0.95,
+              rate(http_request_duration_seconds_bucket{job="markdown-editor/backend-monitor"}[5m])
+            ) > 2
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Slow API response time"
+            description: "95th percentile response time is above 2 seconds. Current: {{ $value }}s"

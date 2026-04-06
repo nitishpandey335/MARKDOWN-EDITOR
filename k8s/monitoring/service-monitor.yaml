@@ -1,0 +1,26 @@
+# ─────────────────────────────────────────────
+# ServiceMonitor — tells Prometheus WHICH service to scrape
+# This is a custom resource added by kube-prometheus-stack (Helm)
+# Prometheus watches for ServiceMonitor objects automatically
+# ─────────────────────────────────────────────
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: backend-monitor
+  namespace: markdown-editor
+  labels:
+    # This label MUST match the Helm release name of kube-prometheus-stack
+    # Default release name is "prometheus" — change if you used a different name
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: backend   # matches the label on backend-service.yaml
+  endpoints:
+    - port: http          # must match the port name in backend-service.yaml
+      path: /metrics      # our Prometheus endpoint in server.js
+      interval: 15s       # scrape every 15 seconds
+      scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+      - markdown-editor   # only look in this namespace

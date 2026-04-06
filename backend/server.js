@@ -8,11 +8,18 @@ const authRoutes = require("./routes/auth");
 const fileRoutes = require("./routes/files");
 const blogRoutes = require("./routes/blogs");
 
+// Prometheus metrics middleware
+const { metricsMiddleware, register } = require("./middleware/metrics");
+
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Attach metrics tracking to all routes
+// Must be before route definitions
+app.use(metricsMiddleware);
 
 // Routes
 app.use("/api/auth", authRoutes);
@@ -20,15 +27,21 @@ app.use("/api/files", fileRoutes);
 app.use("/api/blogs", blogRoutes);
 
 // Health check endpoint — used by Kubernetes liveness/readiness probes
-// Returns 200 when the server is up and DB is connected
 app.get("/api/health", (req, res) => {
   const dbState = mongoose.connection.readyState;
-  // 1 = connected, 2 = connecting
   if (dbState === 1 || dbState === 2) {
     res.status(200).json({ status: "ok", db: "connected" });
   } else {
     res.status(503).json({ status: "error", db: "disconnected" });
   }
+});
+
+// Prometheus metrics endpoint
+// Scraped by Prometheus every 15 seconds
+// Returns all metrics in Prometheus text format
+app.get("/metrics", async (req, res) => {
+  res.set("Content-Type", register.contentType);
+  res.end(await register.metrics());
 });
 
 // MongoDB Connection
