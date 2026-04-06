@@ -1,0 +1,20 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Our Node.js backend — scrapes /metrics endpoint
+  - job_name: 'markdown-backend'
+    static_configs:
+      - targets: ['backend:5000']   # "backend" = docker-compose service name
+    metrics_path: /metrics
+
+  # Node system metrics (CPU, memory, disk of the EC2 host)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
