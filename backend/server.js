@@ -14,7 +14,26 @@ const { metricsMiddleware, register } = require("./middleware/metrics");
 const app = express();
 
 // Middleware
-app.use(cors());
+// Allow requests from local dev and the deployed Vercel frontend
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  process.env.FRONTEND_URL, // set this in Vercel env vars after frontend deploy
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // allow requests with no origin (mobile apps, curl, Postman)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin) || origin.endsWith(".vercel.app")) {
+        return callback(null, true);
+      }
+      callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 // Attach metrics tracking to all routes
